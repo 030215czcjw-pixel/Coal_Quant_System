@@ -241,7 +241,7 @@ if st.button("执行回测分析", use_container_width=True):
             c3.metric("超额增益", f"{(final_nav-prior_nav):.2%}")
 
             # Plotly 图表
-            fig = make_subplots(rows=2, cols=2, subplot_titles=("胜率修正", "净值表现", "信号触发", "实时仓位")，
+            fig = make_subplots(rows=2, cols=2, subplot_titles=("胜率修正", "净值表现", "信号触发", "实时仓位"),
                                specs=[[{"secondary_y": False}, {"secondary_y": False}],
                                     [{"secondary_y": False}, {"secondary_y": True}]])
             fig.add_trace(go.Scatter(x=df_res.index, y=df_res['P(W)'], name='先验', line=dict(color='orange')), 1, 1)
