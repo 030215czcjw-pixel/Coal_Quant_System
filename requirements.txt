@@ -6,3 +6,4 @@ openpyxl
 streamlit
 seaborn
 plotly
+st-gsheets-connection
