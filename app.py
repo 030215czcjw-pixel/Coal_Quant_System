@@ -179,7 +179,7 @@ if st.session_state['xl_object'] is not None:
                 break
         return df
 
-    if st.sidebar.button("📥 加载选定表数据"):
+    if st.sidebar.button("加载选定表数据"):
         df_raw = load_and_clean_feature(xl, feature_selected)
         st.session_state['raw_feature_df'] = df_raw
         st.write(f"✅ {feature_selected} 数据预览：")
@@ -202,7 +202,7 @@ s_input = st.sidebar.text_area("策略逻辑 (Python)", value="df['一阶导数'
 
 # --- 主界面按钮 ---
 
-if st.button("🛠 执行特征工程", use_container_width=True):
+if st.button("执行特征工程", use_container_width=True):
     if 'raw_feature_df' not in st.session_state:
         st.error("请先在左侧加载数据！")
     else:
@@ -214,7 +214,7 @@ if st.button("🛠 执行特征工程", use_container_width=True):
             st.dataframe(processed_fe)
 
 
-if st.button("🚀 执行回测分析", use_container_width=True):
+if st.button("执行回测分析", use_container_width=True):
     if st.session_state['feature_data_after'] is None:
         st.error("请先执行特征工程！")
     else:
