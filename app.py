@@ -192,13 +192,13 @@ baseline_selected = st.sidebar.selectbox("选择基准", ["沪深300"])
 use_kalman = st.sidebar.checkbox("启用卡尔曼滤波", value=True)
 features_op = st.sidebar.multiselect("操作算子", ["移动平均", "差分", "一阶导数", "二阶导数"], default=["一阶导数"])
 
-n_MA = st.sidebar.slider("MA 窗口", 1, 60, 5)
+n_MA = st.sidebar.slider("移动平均窗口", 1, 60, 5)
 n_D = st.sidebar.slider("差分阶数", 1, 10, 1)
-hp = st.sidebar.slider("持有期 (HP)", 1, 365, 5)
-op = st.sidebar.slider("观察期 (OP)", 1, 365, 60)
+hp = st.sidebar.slider("持有期", 1, 365, 5)
+op = st.sidebar.slider("观察期", 1, 365, 60)
 profit_target = st.sidebar.number_input("目标超额收益", value=0.0, step=0.01)
 
-s_input = st.sidebar.text_area("策略逻辑 (Python)", value="df['一阶导数'] < 0")
+s_input = st.sidebar.text_area("策略逻辑 (Python格式)", value="df['一阶导数'] < 0")
 
 # --- 主界面按钮 ---
 
