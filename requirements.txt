@@ -5,3 +5,4 @@ filterpy
 openpyxl
 streamlit
 seaborn
+plotly
