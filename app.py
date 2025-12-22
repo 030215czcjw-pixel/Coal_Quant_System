@@ -246,7 +246,25 @@ if st.button("🚀 执行回测分析", use_container_width=True):
             fig.add_trace(go.Scatter(x=df_res.index, y=df_res['P(W|C)'], name='后验', line=dict(color='grey', dash='dot')), 1, 1)
             fig.add_trace(go.Scatter(x=df_res.index, y=df_res['仓位净值'], name='策略', line=dict(color='red')), 1, 2)
             fig.add_trace(go.Scatter(x=df_res.index, y=df_res['先验仓位净值'], name='基准', line=dict(color='grey')), 1, 2)
-            fig.add_trace(go.Bar(x=df_res.index, y=df_res['信号触发'], name='信号', marker_color='orange', opacity=0.3), 2, 1)
+
+            fig.add_trace(go.Scatter(
+                x=df_res.index, 
+                y=df_res['超额净值'], 
+                name='超额净值', 
+                line=dict(color='blue', width=1.5)
+            ), 2, 1)
+            
+            # 再画信号背景
+            # 技巧：把信号 y 轴放大到超额净值的范围，或者直接用 yaxis2
+            fig.add_trace(go.Scatter(
+                x=df_res.index, 
+                y=df_res['信号触发'], 
+                name='触发脉冲', 
+                fill='tozeroy', 
+                line=dict(width=0),
+                fillcolor='rgba(255, 165, 0, 0.2)', # 浅橙色背景
+            ), 2, 1)
+            
             fig.add_trace(go.Scatter(x=df_res.index, y=df_res['仓位'], name='仓位', fill='tozeroy', line=dict(color='rgba(0,0,255,0.5)')), 2, 2)
             
             fig.update_layout(height=700, template="plotly_white")
