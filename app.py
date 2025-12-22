@@ -309,6 +309,22 @@ def load_data(stock, baseline, feature):
     feature_df = pd.read_excel('动力煤特征.xlsx', sheet_name=feature, index_col='日期', parse_dates=True)
     return stock_df, baseline_df, feature_df
 
+# --- Google Sheets 数据维护 ---
+st.subheader("🌐 云端数据实时维护")
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+try:
+    df_gsheet = conn.read(spreadsheet=st.secrets["gsheet_url"], ttl=0)
+    st.write("在下方编辑数据，点击同步即可永久保存至云端：")
+    edited_df = st.data_editor(df_gsheet, num_rows="dynamic", use_container_width=True)
+    
+    if st.button("✅ 同步修改至云端"):
+        conn.update(spreadsheet=st.secrets["gsheet_url"], data=edited_df)
+        st.success("同步成功！")
+        st.cache_data.clear()
+except:
+    st.warning("请在 Secrets 中配置 gsheet_url 以启用云端同步。目前将使用本地文件。")
+
 # --- 按钮 1：执行特征工程 ---
 if st.button("🛠 执行特征工程"):
     with st.spinner('特征处理中...'):
