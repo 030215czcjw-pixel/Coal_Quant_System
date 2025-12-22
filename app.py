@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import os
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 def apply_filterpy_kalman(series, Q_val=0.01, R_val=0.1):
     from filterpy.kalman import KalmanFilter
@@ -355,37 +356,74 @@ if st.button("🚀 执行回测分析"):
 
         st.success("回测完成！")
         
-        # 3. 结果展示 (2x2 布局)
-        plt.rcParams['font.sans-serif'] = ['Arial Unicode MS'] 
-        plt.rcParams['axes.unicode_minus'] = False
+        # 1. 计算核心指标
+        # 最终策略净值
+        final_strategy_nav = df_result['仓位净值'].iloc[-1]
+        # 最终基准净值
+        final_prior_nav = df_result['先验仓位净值'].iloc[-1]
+
+        # 计算收益率
+        strategy_return = (final_strategy_nav - 1)
+        prior_return = (final_prior_nav - 1)
+        excess_return = strategy_return - prior_return # 超额收益
+
+        # 2. 使用列布局并行显示
+        m1, m2, m3 = st.columns(3)
+
+        with m1:
+            st.metric(
+                label="策略最终净值", 
+                value=f"{final_strategy_nav:.3f}", 
+                delta=f"{strategy_return:.2%}"
+            )
+
+        with m2:
+            st.metric(
+                label="先验基准净值", 
+                value=f"{final_prior_nav:.3f}", 
+                delta=f"{prior_return:.2%}",
+                delta_color="off" # 基准的变化通常设为灰色
+            )
+
+        with m3:
+            # 超额收益，如果是正的就显示绿色增量
+            st.metric(
+                label="贝叶斯超额增益", 
+                value=f"{excess_return:.2%}", 
+                delta=f"{(excess_return):.2%}"
+            )
         
-        def min_max_scale(series):
-            return (series - series.min()) / (series.max() - series.min() + 1e-9)
+        st.divider() # 添加分割线
 
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("胜率修正曲线")
-            f1, a1 = plt.subplots()
-            a1.plot(df_result.index, df_result['P(W)'], label='先验', color='orange')
-            a1.plot(df_result.index, df_result['P(W|C)'], label='后验', color='grey', alpha=0.7)
-            a1.legend(); st.pyplot(f1)
-        with c2:
-            st.subheader("策略净值表现")
-            f2, a2 = plt.subplots()
-            a2.plot(df_result.index, df_result['仓位净值'], label='信号策略', color='orange')
-            a2.plot(df_result.index, df_result['先验仓位净值'], label='基准策略', color='grey', alpha=0.5)
-            a2.legend(); st.pyplot(f2)
+        # 3. Plotly 交互图表 (修复 alpha 后的版本)
+        st.subheader("回测详细数据看板")
 
-        c3, c4 = st.columns(2)
-        with c3:
-            st.subheader("信号触发情况")
-            f3, a3 = plt.subplots()
-            a3.plot(df_result.index, df_result['超额净值'], label='超额净值', color='blue')
-            a3.fill_between(df_result.index, 0, df_result['信号触发'], color='orange', alpha=0.3, label='信号触发')
-            a3.legend(); st.pyplot(f3)
-        with c4:
-            st.subheader("仓位变化情况")
-            f4, a4 = plt.subplots()
-            a4.plot(df_result.index, min_max_scale(df_result['仓位净值']), label='归一化净值', color='orange')
-            a4.plot(df_result.index, df_result['仓位'], label='实时仓位', color='blue', alpha=0.6)
-            a4.legend(); st.pyplot(f4)
+        fig = make_subplots(
+            rows=2, cols=2, 
+            subplot_titles=("胜率修正曲线", "策略净值表现", "信号触发点位", "实时仓位变动")
+        )
+
+        # 子图 1
+        fig.add_trace(go.Scatter(x=df_result.index, y=df_result['P(W)'], name='先验胜率', line=dict(color='orange')), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_result.index, y=df_result['P(W|C)'], name='后验胜率', line=dict(color='grey', dash='dot')), row=1, col=1)
+
+        # 子图 2
+        fig.add_trace(go.Scatter(x=df_result.index, y=df_result['仓位净值'], name='策略净值', line=dict(color='red')), row=1, col=2)
+        fig.add_trace(go.Scatter(x=df_result.index, y=df_result['先验仓位净值'], name='基准净值', line=dict(color='grey')), row=1, col=2)
+
+        # 子图 3
+        fig.add_trace(go.Scatter(x=df_result.index, y=df_result['超额净值'], name='超额净值', line=dict(color='blue')), row=2, col=1)
+        fig.add_trace(go.Bar(x=df_result.index, y=df_result['信号触发'], name='信号', marker_color='orange', opacity=0.3), row=2, col=1)
+
+        # 子图 4 (已修复 alpha 错误)
+        fig.add_trace(go.Scatter(
+            x=df_result.index, 
+            y=df_result['仓位'], 
+            name='实时仓位', 
+            fill='tozeroy', 
+            line=dict(color='rgba(0, 0, 255, 0.5)'), # 使用 rgba 替代 alpha
+            opacity=0.4
+        ), row=2, col=2)
+
+        fig.update_layout(height=700, hovermode="x unified", template="plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
