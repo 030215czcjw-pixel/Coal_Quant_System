@@ -289,7 +289,7 @@ if 'feature_data_after' not in st.session_state:
 st.sidebar.header("策略参数配置")
 stock_selected = st.sidebar.selectbox("选择标的", ["中国神华"])
 baseline_selected = st.sidebar.selectbox("选择基准", ["沪深300"])
-feature_selected = st.sidebar.selectbox("特征维度", ["可用天数", "沿海煤炭运价指数", "北方港合计库存量"])
+feature_selected = st.sidebar.selectbox("特征维度", ["可用天数", "沿海煤炭运价指数", "北方港合计库存量", "全国统筹电厂存煤可用天数（推荐移动平均30日）"])
 feature_frequence = st.sidebar.selectbox("特征频率", ["日", "周", "月"])
 use_kalman = st.sidebar.checkbox("启用卡尔曼滤波", value=True)
 features_op = st.sidebar.multiselect("对所选特征进行的操作", ["移动平均", "差分", "一阶导数", "二阶导数"], default=["一阶导数", "二阶导数"])
