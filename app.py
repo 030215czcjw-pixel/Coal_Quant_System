@@ -153,7 +153,7 @@ if 'feature_data_after' not in st.session_state:
 st.sidebar.header("📁 数据源同步")
 SHEET_ID = "1P3446_9mBi-7qrAMi78F1gHDHGIOCjw-" # 你的谷歌表ID
 
-@st.cache_resource(ttl=3600)
+#@st.cache_resource(ttl=3600)
 def fetch_xl_object(sheet_id):
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
     return pd.ExcelFile(url)
