@@ -141,7 +141,7 @@ def bayesian_analysis(price_data, feature_data, profit_setted, observation_perio
 # ==========================================
 
 st.set_page_config(page_title="煤炭择时回测系统", layout="wide")
-st.title("🚢 煤炭行业贝叶斯择时回测平台")
+st.title("煤炭行业贝叶斯择时回测平台")
 
 # 初始化数据状态
 if 'xl_object' not in st.session_state:
