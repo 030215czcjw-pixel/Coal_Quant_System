@@ -245,7 +245,7 @@ if st.sidebar.button("同步云端表", use_container_width=True):
 # 只有同步后才显示下拉菜单
 if st.session_state['xl_object'] is not None:
     xl = st.session_state['xl_object']
-    feature_selected = st.sidebar.selectbox("选择特征维度", xl.sheet_names)
+    
     
     # 核心数据加载函数：带日期自动识别
     def load_and_clean_feature(xl_obj, sheet_name):
@@ -258,138 +258,136 @@ if st.session_state['xl_object'] is not None:
                 break
         return df
 
-    #if st.button("加载选定表数据", use_container_width=True):
+    # --- 侧边栏：参数配置 ---
+    stock_selected = st.sidebar.selectbox("选择标的", ["中国神华", "综合交易价_CCTD秦皇岛动力煤(Q5500)"])
+    baseline_selected = st.sidebar.selectbox("选择基准", ["沪深300"])
+    feature_selected = st.sidebar.selectbox("选择特征维度", xl.sheet_names)
     df_raw = load_and_clean_feature(xl, feature_selected)
     st.session_state['raw_feature_df'] = df_raw
-    st.write(f"{feature_selected} 数据预览：")
-    st.dataframe(df_raw)
+    
+    use_kalman = st.sidebar.checkbox("启用卡尔曼滤波", value=True)
 
-# --- 侧边栏：参数配置 ---
-stock_selected = st.sidebar.selectbox("选择标的", ["中国神华", "综合交易价_CCTD秦皇岛动力煤(Q5500)"])
-baseline_selected = st.sidebar.selectbox("选择基准", ["沪深300"])
-use_kalman = st.sidebar.checkbox("启用卡尔曼滤波", value=True)
+    n_lag = st.sidebar.slider("滞后期数", 0, 60, 1)
+    n_MA = st.sidebar.slider("移动平均窗口", 0, 60, 5)
+    n_D = st.sidebar.slider("差分期数", 0, 365, 1)
+    n_yoy = st.sidebar.selectbox("同比期数(1即为环比)", [0, 1, 12, 52, 252])
 
-n_lag = st.sidebar.slider("滞后期数", 0, 60, 1)
-n_MA = st.sidebar.slider("移动平均窗口", 0, 60, 5)
-n_D = st.sidebar.slider("差分期数", 0, 365, 1)
-n_yoy = st.sidebar.selectbox("同比期数(1即为环比)", [0, 1, 12, 52, 252])
+    hp = st.sidebar.slider("持有期（以数据频率为单位）", 1, 365, 5)
+    op = st.sidebar.slider("观察期（以数据频率为单位）", 1, 365, 60)
+    profit_target = st.sidebar.number_input("目标超额收益", value=0.0, step=0.01)
 
-hp = st.sidebar.slider("持有期（以数据频率为单位）", 1, 365, 5)
-op = st.sidebar.slider("观察期（以数据频率为单位）", 1, 365, 60)
-profit_target = st.sidebar.number_input("目标超额收益", value=0.0, step=0.01)
+    s_input = st.sidebar.text_area("策略逻辑 (Python格式)", value="df[''] < 0")
 
-s_input = st.sidebar.text_area("策略逻辑 (Python格式)", value="df[''] < 0")
+    # --- 主界面按钮 ---
 
-# --- 主界面按钮 ---
+    if st.button("执行特征工程", use_container_width=True):
+        if 'raw_feature_df' not in st.session_state:
+            st.error("请先在左侧加载数据！")
+        else:
+            with st.spinner('特征处理中...'):
+                raw_f = st.session_state['raw_feature_df']
+                fe_engine = TimeSeriesFeatureEngineer(raw_f )
+                processed_fe = fe_engine.generate_features(n_lag, n_MA, n_D, n_yoy, use_kalman) # 执行特征工程
+                st.session_state['feature_data_after'] = processed_fe
+                st.success("特征工程完成！")
+                st.dataframe(processed_fe)
 
-if st.button("执行特征工程", use_container_width=True):
-    if 'raw_feature_df' not in st.session_state:
-        st.error("请先在左侧加载数据！")
-    else:
-        with st.spinner('特征处理中...'):
-            raw_f = st.session_state['raw_feature_df']
-            fe_engine = TimeSeriesFeatureEngineer(raw_f )
-            processed_fe = fe_engine.generate_features(n_lag, n_MA, n_D, n_yoy, use_kalman) # 执行特征工程
-            st.session_state['feature_data_after'] = processed_fe
-            st.success("特征工程完成！")
-            st.dataframe(processed_fe)
+    if st.button("执行回测分析", use_container_width=True):
+        if st.session_state['feature_data_after'] is None:
+            st.error("请先执行特征工程！")
+        else:
+            with st.spinner('贝叶斯回测中...'):
+                # 读取本地股票数据 (需确保文件在同目录下)
+                try:
+                    stock_raw = pd.read_excel('stock_data.xlsx', sheet_name=stock_selected, index_col='日期', parse_dates=True)
+                    baseline_raw = pd.read_excel('stock_data.xlsx', sheet_name=baseline_selected, index_col='date', parse_dates=True)
+                except:
+                    st.error("本地 stock_data.xlsx 读取失败，请检查文件。")
+                    st.stop()
 
-if st.button("执行回测分析", use_container_width=True):
-    if st.session_state['feature_data_after'] is None:
-        st.error("请先执行特征工程！")
-    else:
-        with st.spinner('贝叶斯回测中...'):
-            # 读取本地股票数据 (需确保文件在同目录下)
-            try:
-                stock_raw = pd.read_excel('stock_data.xlsx', sheet_name=stock_selected, index_col='日期', parse_dates=True)
-                baseline_raw = pd.read_excel('stock_data.xlsx', sheet_name=baseline_selected, index_col='date', parse_dates=True)
-            except:
-                st.error("本地 stock_data.xlsx 读取失败，请检查文件。")
-                st.stop()
+                feature_df = st.session_state['feature_data_after']
+                
+                tester = BayesianStrategyBacktester(
+                    stock_data=stock_raw,
+                    baseline_data=baseline_raw,
+                    feature_data=feature_df,
+                    profit_setted=profit_target,    # 设定超额收益门槛 2%
+                    observation_periods=op,# 观察期 60天
+                    holding_period=hp       # 持有期 5天
+                )
+                
+                df_res = tester.run_strategy(
+                    feature_cols=feature_df.columns.tolist(),
+                    strategy_expression=s_input
+                )
 
-            feature_df = st.session_state['feature_data_after']
-            
-            tester = BayesianStrategyBacktester(
-                stock_data=stock_raw,
-                baseline_data=baseline_raw,
-                feature_data=feature_df,
-                profit_setted=profit_target,    # 设定超额收益门槛 2%
-                observation_periods=op,# 观察期 60天
-                holding_period=hp       # 持有期 5天
-            )
-            
-            df_res = tester.run_strategy(
-                feature_cols=feature_df.columns.tolist(),
-                strategy_expression=s_input
-            )
+                # --- 结果展示 ---
+                final_nav = df_res['仓位净值'].iloc[-1]
+                prior_nav = df_res['先验仓位净值'].iloc[-1]
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("策略净值", f"{final_nav:.3f}", f"{(final_nav-1):.2%}")
+                c2.metric("先验净值", f"{prior_nav:.3f}", f"{(prior_nav-1):.2%}", delta_color="off")
+                c3.metric("超额增益", f"{(final_nav-prior_nav):.2%}")
 
-            # --- 结果展示 ---
-            final_nav = df_res['仓位净值'].iloc[-1]
-            prior_nav = df_res['先验仓位净值'].iloc[-1]
-            
-            c1, c2, c3 = st.columns(3)
-            c1.metric("策略净值", f"{final_nav:.3f}", f"{(final_nav-1):.2%}")
-            c2.metric("先验净值", f"{prior_nav:.3f}", f"{(prior_nav-1):.2%}", delta_color="off")
-            c3.metric("超额增益", f"{(final_nav-prior_nav):.2%}")
+                # Plotly 图表
+                fig = make_subplots(rows=2, cols=2, subplot_titles=("胜率修正", "净值表现", "信号触发", "实时仓位"),
+                                specs=[[{"secondary_y": False}, {"secondary_y": False}],
+                                        [{"secondary_y": False}, {"secondary_y": True}]])
+                fig.add_trace(go.Scatter(x=df_res.index, y=df_res['P(W)'], name='先验', line=dict(color='orange')), 1, 1)
+                fig.add_trace(go.Scatter(x=df_res.index, y=df_res['P(W|C)'], name='后验', line=dict(color='grey', dash='dot')), 1, 1)
+                fig.add_trace(go.Scatter(x=df_res.index, y=df_res['仓位净值'], name='策略仓位净值', line=dict(color='red')), 1, 2)
+                fig.add_trace(go.Scatter(x=df_res.index, y=df_res['先验仓位净值'], name='先验仓位净值', line=dict(color='grey')), 1, 2)
 
-            # Plotly 图表
-            fig = make_subplots(rows=2, cols=2, subplot_titles=("胜率修正", "净值表现", "信号触发", "实时仓位"),
-                               specs=[[{"secondary_y": False}, {"secondary_y": False}],
-                                    [{"secondary_y": False}, {"secondary_y": True}]])
-            fig.add_trace(go.Scatter(x=df_res.index, y=df_res['P(W)'], name='先验', line=dict(color='orange')), 1, 1)
-            fig.add_trace(go.Scatter(x=df_res.index, y=df_res['P(W|C)'], name='后验', line=dict(color='grey', dash='dot')), 1, 1)
-            fig.add_trace(go.Scatter(x=df_res.index, y=df_res['仓位净值'], name='策略仓位净值', line=dict(color='red')), 1, 2)
-            fig.add_trace(go.Scatter(x=df_res.index, y=df_res['先验仓位净值'], name='先验仓位净值', line=dict(color='grey')), 1, 2)
-
-            fig.add_trace(go.Scatter(
-                x=df_res.index, 
-                y=df_res['超额净值'], 
-                name='超额净值', 
-                line=dict(color='blue', width=1.5)
-            ), 2, 1)
-            
-            # 再画信号背景
-            # 技巧：把信号 y 轴放大到超额净值的范围，或者直接用 yaxis2
-            fig.add_trace(go.Scatter(
-                x=df_res.index, 
-                y=df_res['信号触发'], 
-                name='触发脉冲', 
-                fill='tozeroy', 
-                line=dict(width=0),
-                fillcolor='rgba(255, 165, 0, 0.2)', # 浅橙色背景
-            ), 2, 1)
-            
-            fig.add_trace(
-                go.Scatter(
+                fig.add_trace(go.Scatter(
                     x=df_res.index, 
                     y=df_res['超额净值'], 
                     name='超额净值', 
-                    line=dict(color='blue', width=2),
-                    hovertemplate='日期: %{x}<br>超额净值: %{y:.4f}<extra></extra>'
-                ), 
-                row=2, col=2, secondary_y=False
-            )
-            
-            # 2. 绘制仓位（作为次 Y 轴阴影，使用阶梯线）
-            fig.add_trace(
-                go.Scatter(
+                    line=dict(color='blue', width=1.5)
+                ), 2, 1)
+                
+                # 再画信号背景
+                # 技巧：把信号 y 轴放大到超额净值的范围，或者直接用 yaxis2
+                fig.add_trace(go.Scatter(
                     x=df_res.index, 
-                    y=df_res['仓位'], 
-                    name='策略仓位', 
+                    y=df_res['信号触发'], 
+                    name='触发脉冲', 
                     fill='tozeroy', 
-                    # 核心优化：使用阶梯线（hv），真实还原调仓的离散跳变
-                    line_shape='hv', 
-                    line=dict(color='rgba(255, 165, 0, 0.8)', width=1), 
-                    # 浅橙色填充，不遮挡背景净值线
-                    fillcolor='rgba(255, 165, 0, 0.2)', 
-                    hovertemplate='日期: %{x}<br>当前仓位: %{y:.2f}<extra></extra>'
-                ), 
-                row=2, col=2, secondary_y=True
-            )
-            
-            # 3. 更新 Y 轴设置，确保尺度专业
-            fig.update_yaxes(title_text="净值水平", secondary_y=False, row=2, col=2)
-            fig.update_yaxes(title_text="仓位权重", range=[0, 1.1], secondary_y=True, row=2, col=2)
-            
-            fig.update_layout(height=700, template="plotly_white")
-            st.plotly_chart(fig, use_container_width=True)
+                    line=dict(width=0),
+                    fillcolor='rgba(255, 165, 0, 0.2)', # 浅橙色背景
+                ), 2, 1)
+                
+                fig.add_trace(
+                    go.Scatter(
+                        x=df_res.index, 
+                        y=df_res['超额净值'], 
+                        name='超额净值', 
+                        line=dict(color='blue', width=2),
+                        hovertemplate='日期: %{x}<br>超额净值: %{y:.4f}<extra></extra>'
+                    ), 
+                    row=2, col=2, secondary_y=False
+                )
+                
+                # 2. 绘制仓位（作为次 Y 轴阴影，使用阶梯线）
+                fig.add_trace(
+                    go.Scatter(
+                        x=df_res.index, 
+                        y=df_res['仓位'], 
+                        name='策略仓位', 
+                        fill='tozeroy', 
+                        # 核心优化：使用阶梯线（hv），真实还原调仓的离散跳变
+                        line_shape='hv', 
+                        line=dict(color='rgba(255, 165, 0, 0.8)', width=1), 
+                        # 浅橙色填充，不遮挡背景净值线
+                        fillcolor='rgba(255, 165, 0, 0.2)', 
+                        hovertemplate='日期: %{x}<br>当前仓位: %{y:.2f}<extra></extra>'
+                    ), 
+                    row=2, col=2, secondary_y=True
+                )
+                
+                # 3. 更新 Y 轴设置，确保尺度专业
+                fig.update_yaxes(title_text="净值水平", secondary_y=False, row=2, col=2)
+                fig.update_yaxes(title_text="仓位权重", range=[0, 1.1], secondary_y=True, row=2, col=2)
+                
+                fig.update_layout(height=700, template="plotly_white")
+                st.plotly_chart(fig, use_container_width=True)
